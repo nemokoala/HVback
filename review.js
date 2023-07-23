@@ -134,7 +134,7 @@ module.exports = (db) => {
       [reviewId],
       (error, results) => {
         if (error) return res.status(400).send(error);
-        results[0].room = JSON.parse(resulsts[0].room);
+        results[0].room = JSON.parse(results[0].room);
         return res.status(200).send(results[0]);
       }
     );
