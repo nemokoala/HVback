@@ -82,6 +82,10 @@ module.exports = (db) => {
     review.id DESC`,
       (error, results) => {
         if (error) return res.status(400).send(error);
+        //룸 객체 변환
+        results.forEach((result) => {
+          result.room = JSON.parse(result.room);
+        });
         return res.status(200).send(results);
       }
     );
