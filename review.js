@@ -229,5 +229,45 @@ module.exports = (db) => {
     );
   });
 
+  router.get(`/mypage/all`, authenticateUser(db), (req, res) => {
+    const user = req.user;
+    db.query(
+      `SELECT
+    review.id,
+    JSON_OBJECT(
+      'id', room.id,
+      'building', room.building,
+      'newAddress', room.newAddress,
+      'oldAddress', room.oldAddress,
+      'latitude', room.latitude,
+      'longitude', room.longitude,
+      'sido', room.sido,
+      'sigungu', room.sigungu,
+      'dong', room.dong
+    ) AS room,
+    review.userId,
+    review.nickname,
+    review.pros,
+    review.cons,
+    review.score
+  FROM
+    review
+  INNER JOIN
+    room ON review.roomId = room.id 
+    WHERE userId = ? 
+  ORDER BY
+    review.id DESC
+    `,
+      [user.id],
+      (error, results) => {
+        if (error) return res.status(400).send(error);
+        //룸 객체 변환
+        results.forEach((result) => {
+          result.room = JSON.parse(result.room);
+        });
+        return res.status(200).json(results);
+      }
+    );
+  });
   return router;
 };

@@ -49,25 +49,42 @@ app.get("/", (req, res) => {
 });
 
 app.post("/register", async (req, res) => {
-  const { name, nickname, email, password } = req.body;
+  const { nickname, email, password } = req.body;
+  const nicknameRegex = /^[a-zA-Z가-힣]{2,8}$/; // 영어, 한글 8글자 이내
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/; // 이메일 형식
+  const passwordRegex = /^(?=.*[a-zA-Z])(?=.*\d).{8,}$/; // 영어, 숫자 포함 8자리 이상
+
   if (!nickname || !email || !password) {
     return res.status(400).send("빈칸을 모두 채워주세요.");
   }
-  if (nickname.length > 10)
-    return res.status(400).send("유저 이름은 10글자 이내로 정해주세요.");
+  if (!nicknameRegex.test(nickname)) {
+    return res
+      .status(400)
+      .send("유저 닉네임은 한글, 영어만 사용해서 2~8글자로 정해주세요.");
+  }
+
+  if (!emailRegex.test(email)) {
+    return res.status(400).send("올바른 이메일 형식이 아닙니다.");
+  }
+
+  if (!passwordRegex.test(password)) {
+    return res
+      .status(400)
+      .send("패스워드는 영어와 숫자를 포함하여 8자리 이상으로 정해주세요.");
+  }
   try {
     salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
     const sqlQuery =
-      "INSERT INTO users (name, nickname, email, password, role) VALUES (?, ?, ?, ?, ?)";
+      "INSERT INTO users (nickname, email, password, role) VALUES (?, ?, ?, ?)";
     db.query(
       sqlQuery,
-      [name, nickname, email, hashedPassword, "MEMBER"],
+      [nickname, email, hashedPassword, "MEMBER"],
       (error, results) => {
         if (error) {
           if (error.code === "ER_DUP_ENTRY")
-            return res.status(400).send("이메일 또는 유저 이름이 중복됩니다.");
-          res.status(500).send("회원가입 중 오류가 발생했습니다.");
+            return res.status(400).send("이미 가입된 이메일입니다.");
+          res.status(400).send("회원가입 중 오류가 발생했습니다.");
         } else {
           console.log(results);
           res.status(201).send("회원 가입이 완료되었습니다.");
@@ -113,6 +130,11 @@ app.post("/login", (req, res) => {
 
 app.get(`/register/check/:email`, (req, res) => {
   const email = req.params.email;
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/; // 이메일 형식
+  if (!emailRegex.test(email)) {
+    return res.status(400).send("올바른 이메일 형식이 아닙니다.");
+  }
+
   db.query(`SELECT * FROM users WHERE email = ?`, [email], (error, results) => {
     if (error) return res.status(400).send(error);
     if (results.length > 0)

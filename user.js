@@ -30,6 +30,7 @@ module.exports = (db) => {
   router.post(`/checkpw`, authenticateUser(db), (req, res) => {
     const user = req.user;
     const { password } = req.body;
+
     db.query(
       `SELECT * FROM users WHERE email = ?`,
       [user.email],
@@ -38,7 +39,7 @@ module.exports = (db) => {
           password,
           results[0].password
         );
-        if (error) return res.status(500).send(error);
+        if (error) return res.status(400).send(error);
         if (validPassword) return res.status(200).send("ok");
         else return res.status(202).send("failed");
       }
@@ -48,6 +49,18 @@ module.exports = (db) => {
   router.post(`/update`, authenticateUser(db), async (req, res) => {
     const user = req.user;
     const { nickname, password } = req.body;
+    const nicknameRegex = /^[a-zA-Z가-힣]{2,8}$/; // 영어, 한글 8글자 이내
+    const passwordRegex = /^(?=.*[a-zA-Z])(?=.*\d).{8,}$/; // 영어, 숫자 포함 8자리 이상
+    if (!nicknameRegex.test(nickname)) {
+      return res
+        .status(400)
+        .send("유저 닉네임은 한글, 영어만 사용해서 2~8글자로 정해주세요.");
+    }
+    if (!passwordRegex.test(password)) {
+      return res
+        .status(400)
+        .send("패스워드는 영어와 숫자를 포함하여 8자리 이상으로 정해주세요.");
+    }
     salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
     db.query(

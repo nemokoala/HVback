@@ -97,8 +97,8 @@ module.exports = (db) => {
     const reviewId = req.params.id;
     let roomId;
     db.query(
-      `SELECT * FROM review WHERE id = ? AND userId = ?`,
-      [reviewId, user.id],
+      `SELECT * FROM review WHERE id = ?`,
+      [reviewId],
       (error, results) => {
         if (error) return res.status(400).send(error);
         roomId = results[0].roomId;
