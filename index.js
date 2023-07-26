@@ -8,6 +8,7 @@ const mysql = require("mysql2");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
 const cookieParser = require("cookie-parser");
+const nodemailer = require("nodemailer");
 
 let corsOptions = {
   origin: "*",
@@ -35,6 +36,17 @@ app.use("/review", reviewRoutes);
 const adminRoutes = require("./admin")(db);
 app.use("/admin", adminRoutes);
 
+const transporter = nodemailer.createTransport({
+  host: "smtp.naver.com",
+  port: 587,
+  secure: false,
+  auth: {
+    user: process.env.N_EMAIL,
+    pass: process.env.N_PASSWORD,
+  },
+  authMethod: "PLAIN",
+});
+
 app.listen(PORT, () => {
   console.log(`running on port ${PORT}`);
 });
@@ -47,7 +59,21 @@ app.get("/", (req, res) => {
     console.log(err);
   });
 });
-
+app.get("/email", async (req, res) => {
+  let verifyNum = Math.floor(Math.random() * 99999) + 10000;
+  try {
+    const info = await transporter.sendMail({
+      from: process.env.N_EMAIL, // 보내는 사람 이메일
+      to: "fdxguy2@gmail.com", // 수신자 이메일
+      subject: "네이버 이메일로 보낸 메일", // 이메일 제목
+      text: `안녕하세요, 홈뷰 인증 번호입니다. ${verifyNum} `, // 이메일 내용 (텍스트 형식)
+      // html: '<p>안녕하세요, 네이버 이메일을 통해 보낸 메일입니다.</p>', // 이메일 내용 (HTML 형식)
+    });
+    console.log("이메일이 성공적으로 전송되었습니다:", info.messageId);
+  } catch (error) {
+    console.error("이메일 전송 중 오류가 발생했습니다:", error);
+  }
+});
 app.post("/register", async (req, res) => {
   const { nickname, email, password } = req.body;
   const nicknameRegex = /^[a-zA-Z가-힣]{2,8}$/; // 영어, 한글 8글자 이내
@@ -76,17 +102,39 @@ app.post("/register", async (req, res) => {
     salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
     const sqlQuery =
-      "INSERT INTO users (nickname, email, password, role) VALUES (?, ?, ?, ?)";
+      "INSERT INTO users (nickname, email, password, role, verified, registerTime) VALUES (?, ?, ?, ?, ?, ?)";
     db.query(
       sqlQuery,
-      [nickname, email, hashedPassword, "MEMBER"],
-      (error, results) => {
+      [nickname, email, hashedPassword, "MEMBER", false, new Date()],
+      async (error, results) => {
         if (error) {
           if (error.code === "ER_DUP_ENTRY")
             return res.status(400).send("이미 가입된 이메일입니다.");
           res.status(400).send("회원가입 중 오류가 발생했습니다.");
         } else {
+          //회원가입 완료
           console.log(results);
+          let verifyNum = Math.floor(Math.random() * 99999) + 10000;
+          try {
+            const info = await transporter.sendMail({
+              from: process.env.N_EMAIL, // 보내는 사람 이메일
+              to: email, // 수신자 이메일
+              subject: "홈뷰 인증 메일", // 이메일 제목
+              text: `안녕하세요, 홈뷰 인증 번호입니다. 로그인 후 "${verifyNum}" 번호를 입력하여 가입을 완료해주세요. `, // 이메일 내용 (텍스트 형식)
+              // html: '<p>안녕하세요, 네이버 이메일을 통해 보낸 메일입니다.</p>', // 이메일 내용 (HTML 형식)
+            });
+            console.log("이메일이 성공적으로 전송되었습니다:", info.messageId);
+            //이메일 전송이 완료되면 확인db에 코드 추가
+            db.query(
+              "INSERT INTO verify (email, code, verifyTime) VALUES (?, ?, ?)",
+              [email, verifyNum.toString(), new Date()],
+              (error, results) => {
+                if (error) return res.status(400).send(error);
+              }
+            );
+          } catch (error) {
+            console.error("이메일 전송 중 오류가 발생했습니다:", error);
+          }
           res.status(201).send("회원 가입이 완료되었습니다.");
         }
       }
@@ -122,6 +170,7 @@ app.post("/login", (req, res) => {
         email: results[0].email,
         role: results[0].role,
         token: token,
+        verified: results[0].verified,
       };
       res.status(201).json({ ...user });
     }
@@ -143,6 +192,72 @@ app.get(`/register/check/:email`, (req, res) => {
   });
 });
 
+app.post(`/verify`, authenticateUser(db), (req, res) => {
+  const user = req.user;
+  const { verifyCode } = req.body;
+  db.query(
+    `SELECT * FROM verify WHERE email = ?`,
+    [user.email],
+    (error, results) => {
+      if (error) return res.status(400).send(error);
+      if (verifyCode !== results[0].code)
+        return res.status(400).send("인증 번호가 일치하지 않습니다.");
+      else {
+        db.query(
+          `UPDATE users SET verified = ? WHERE email = ?`,
+          [true, user.email],
+          (error, results) => {
+            if (error) return res.status(400).send(error);
+            db.query(
+              `DELETE FROM verify WHERE email = ?`,
+              [user.email],
+              (error, results) => {
+                if (error) return res.status(400).send(error);
+              }
+            );
+            return res.status(200).send("ok");
+          }
+        );
+      }
+    }
+  );
+});
+
+app.get(`/verify/resend`, authenticateUser(db), async (req, res) => {
+  const user = req.user;
+  let verifyNum = Math.floor(Math.random() * 99999) + 10000;
+
+  db.query(
+    `DELETE FROM verify WHERE email = ?`,
+    [user.email],
+    (error, results) => {
+      if (error) return res.status(400).send(error);
+    }
+  );
+
+  try {
+    const info = await transporter.sendMail({
+      from: process.env.N_EMAIL, // 보내는 사람 이메일
+      to: user.email, // 수신자 이메일
+      subject: "홈뷰 인증 메일", // 이메일 제목
+      text: `안녕하세요, 홈뷰 인증 번호입니다. 로그인 후 "${verifyNum}" 번호를 입력하여 가입을 완료해주세요. `, // 이메일 내용 (텍스트 형식)
+      // html: '<p>안녕하세요, 네이버 이메일을 통해 보낸 메일입니다.</p>', // 이메일 내용 (HTML 형식)
+    });
+    console.log("이메일이 성공적으로 전송되었습니다:", info.messageId);
+    //이메일 전송이 완료되면 확인db에 코드 추가
+    db.query(
+      "INSERT INTO verify (email, code, verifyTime) VALUES (?, ?, ?)",
+      [user.email, verifyNum.toString(), new Date()],
+      (error, results) => {
+        if (error) return res.status(400).send(error);
+        res.status(200).send("재전송 완료");
+      }
+    );
+  } catch (error) {
+    console.error("이메일 전송 중 오류가 발생했습니다:", error);
+  }
+});
+
 app.post("/kakao/auth", (req, res) => {
   const { nickname, email, password, sessionTime } = req.body;
   if (!email || !password) {
@@ -160,10 +275,10 @@ app.post("/kakao/auth", (req, res) => {
           salt = await bcrypt.genSalt(10);
           const hashedPassword = await bcrypt.hash(password, salt);
           const sqlQuery =
-            "INSERT INTO users (nickname, email, password, role, kakao) VALUES (?, ?, ?, ?, ?)";
+            "INSERT INTO users (nickname, email, password, role, kakao, verified, registerTime) VALUES (?, ?, ?, ?, ?, ?, ?)";
           db.query(
             sqlQuery,
-            [nickname, email, hashedPassword, "MEMBER", true],
+            [nickname, email, hashedPassword, "MEMBER", true, true, new Date()],
             (error, results) => {
               if (error) {
                 if (error.code === "ER_DUP_ENTRY")
@@ -197,7 +312,8 @@ app.post("/kakao/auth", (req, res) => {
           email: results[0].email,
           role: results[0].role,
           token: token,
-          kakao: true,
+          kakao: results[0].kakao,
+          verified: results[0].verified,
         };
         res.status(201).json({ ...user });
       }

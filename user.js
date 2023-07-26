@@ -82,6 +82,7 @@ module.exports = (db) => {
               email: results[0].email,
               role: results[0].role,
               kakao: results[0].kakao,
+              verified: results[0].verified,
             };
             console.log("user : " + JSON.stringify(user));
             resolve(user);
