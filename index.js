@@ -142,3 +142,65 @@ app.get(`/register/check/:email`, (req, res) => {
     else return res.status(200).send("ok");
   });
 });
+
+app.post("/kakao/auth", (req, res) => {
+  const { nickname, email, password, sessionTime } = req.body;
+  if (!email || !password) {
+    return res.status(400).send("카카오 유저 정보를 받을 수 없습니다.");
+  }
+
+  db.query(
+    `SELECT * FROM users WHERE email = ?`,
+    [email],
+    async (error, results) => {
+      if (error) throw error;
+
+      if (results.length === 0) {
+        try {
+          salt = await bcrypt.genSalt(10);
+          const hashedPassword = await bcrypt.hash(password, salt);
+          const sqlQuery =
+            "INSERT INTO users (nickname, email, password, role, kakao) VALUES (?, ?, ?, ?, ?)";
+          db.query(
+            sqlQuery,
+            [nickname, email, hashedPassword, "MEMBER", true],
+            (error, results) => {
+              if (error) {
+                if (error.code === "ER_DUP_ENTRY")
+                  return res.status(400).send("이미 가입된 이메일입니다.");
+                res.status(400).send("회원가입 중 오류가 발생했습니다.");
+              } else {
+                console.log(results);
+                res.status(202).send("회원 가입이 완료되었습니다.");
+              }
+            }
+          );
+        } catch (error) {
+          res.status(500).send("회원가입 중 오류가 발생했습니다.");
+        }
+      }
+      if (results.length > 0) {
+        const validPassword = await bcrypt.compare(
+          password,
+          results[0].password
+        );
+        if (!validPassword)
+          return res.status(401).send("유저이름 또는 비밀번호가 틀립니다.");
+
+        const expiresIn = `${sessionTime}m`;
+        const token = jwt.sign({ id: results[0].id }, process.env.SECRET_KEY, {
+          expiresIn,
+        });
+        const user = {
+          id: results[0].id,
+          nickname: results[0].nickname,
+          email: results[0].email,
+          role: results[0].role,
+          token: token,
+          kakao: true,
+        };
+        res.status(201).json({ ...user });
+      }
+    }
+  );
+});

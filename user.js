@@ -11,13 +11,6 @@ module.exports = (db) => {
       `SELECT * FROM users WHERE id = ?`,
       [user.id],
       async (error, results) => {
-        const user = {
-          id: results[0].id,
-          nickname: results[0].nickname,
-          email: results[0].email,
-          role: results[0].role,
-          token: req.token,
-        };
         if (error) return res.status(400).send(error);
         if (results.length > 0) {
           const userData = await getUser(user.id);
@@ -88,6 +81,7 @@ module.exports = (db) => {
               nickname: results[0].nickname,
               email: results[0].email,
               role: results[0].role,
+              kakao: results[0].kakao,
             };
             console.log("user : " + JSON.stringify(user));
             resolve(user);
