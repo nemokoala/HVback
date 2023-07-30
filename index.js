@@ -155,7 +155,8 @@ app.post("/login", (req, res) => {
     [email],
     async (error, results) => {
       if (error) throw error;
-
+      if (results[0].kakao === true)
+        return res.status(400).send("카카오계정으로 로그인 해주세요.");
       const validPassword = await bcrypt.compare(password, results[0].password);
       if (!validPassword)
         return res.status(401).send("유저이름 또는 비밀번호가 틀립니다.");
