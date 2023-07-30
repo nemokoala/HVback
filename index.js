@@ -52,12 +52,7 @@ app.listen(PORT, () => {
 });
 
 app.get("/", (req, res) => {
-  const sqlQuery = `SELECT *FROM post`;
-  db.query(sqlQuery, (err, result) => {
-    console.log(result);
-    res.send(result);
-    console.log(err);
-  });
+  res.send("SERVER ON");
 });
 app.get("/email", async (req, res) => {
   let verifyNum = Math.floor(Math.random() * 99999) + 10000;
@@ -155,8 +150,9 @@ app.post("/login", (req, res) => {
     [email],
     async (error, results) => {
       if (error) throw error;
-      if (results[0].kakao === true)
-        return res.status(400).send("카카오계정으로 로그인 해주세요.");
+      console.log(results[0]);
+      if (results[0].kakao === 1)
+        return res.status(400).send("해당 계정은 카카오로 로그인 해주세요.");
       const validPassword = await bcrypt.compare(password, results[0].password);
       if (!validPassword)
         return res.status(401).send("유저이름 또는 비밀번호가 틀립니다.");
