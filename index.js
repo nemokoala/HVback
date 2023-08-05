@@ -170,8 +170,8 @@ app.post("/login", (req, res) => {
       };
       res.cookie("token", token, {
         httpOnly: true,
-        secure: true,
-        sameSite: "None",
+        // secure: true,
+        // sameSite: "None",
       });
       res.status(201).json({ ...user });
     }
@@ -317,8 +317,8 @@ app.post("/kakao/auth", (req, res) => {
         };
         res.cookie("token", token, {
           httpOnly: true,
-          secure: true,
-          sameSite: "None",
+          // secure: true,
+          // sameSite: "None",
         });
         res.status(201).json({ ...user });
       }
