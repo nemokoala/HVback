@@ -166,13 +166,13 @@ app.post("/login", (req, res) => {
         nickname: results[0].nickname,
         email: results[0].email,
         role: results[0].role,
-        token: token,
         verified: results[0].verified,
       };
       res.cookie("token", token, {
         httpOnly: true,
         secure: true,
         sameSite: "None",
+        maxAge: parseInt(sessionTime) * 60 * 1000,
       });
       res.status(201).json({ ...user });
     }
@@ -313,10 +313,15 @@ app.post("/kakao/auth", (req, res) => {
           nickname: results[0].nickname,
           email: results[0].email,
           role: results[0].role,
-          token: token,
           kakao: results[0].kakao,
           verified: results[0].verified,
         };
+        res.cookie("token", token, {
+          httpOnly: true,
+          secure: true,
+          sameSite: "None",
+          maxAge: parseInt(sessionTime) * 60 * 1000,
+        });
         res.status(201).json({ ...user });
       }
     }
