@@ -172,7 +172,6 @@ app.post("/login", (req, res) => {
         httpOnly: true,
         secure: true,
         sameSite: "None",
-        maxAge: parseInt(sessionTime) * 60 * 1000,
       });
       res.status(201).json({ ...user });
     }
@@ -320,7 +319,6 @@ app.post("/kakao/auth", (req, res) => {
           httpOnly: true,
           secure: true,
           sameSite: "None",
-          maxAge: parseInt(sessionTime) * 60 * 1000,
         });
         res.status(201).json({ ...user });
       }
