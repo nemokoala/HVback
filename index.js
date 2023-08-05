@@ -11,7 +11,7 @@ const cookieParser = require("cookie-parser");
 const nodemailer = require("nodemailer");
 
 let corsOptions = {
-  origin: "*",
+  origin: ["http://localhost:8080", "https://homereview.netlify.app/"],
   credentials: true,
 };
 app.use(cookieParser());
@@ -169,6 +169,11 @@ app.post("/login", (req, res) => {
         token: token,
         verified: results[0].verified,
       };
+      res.cookie("token", token, {
+        httpOnly: true,
+        secure: false,
+        sameSite: "none",
+      });
       res.status(201).json({ ...user });
     }
   );
