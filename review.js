@@ -59,9 +59,16 @@ module.exports = (db) => {
           db.query(
             `SELECT * FROM review WHERE roomId = ? AND userId = ?`,
             [roomId, user.id],
-            (error, results) => {
+            async (error, results) => {
               if (error) return res.status(400).send(error);
-              if (results.length > 0) return res.status(202).send("중복방");
+              if (results.length > 0) {
+                if (results[0].imageUrl !== "")
+                  await deleteImageFromS3(
+                    "homereview1",
+                    imageUrl.split(".com/")[1]
+                  );
+                return res.status(202).send("중복방");
+              }
 
               db.query(
                 `INSERT INTO review (roomId, userId, nickname, pros, cons, score, imageUrl) VALUES (?, ?, ?, ?, ?, ?, ?)`,
