@@ -3,11 +3,20 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { authenticateUser } = require("./userCheck");
 const router = express.Router();
+const AWS = require("aws-sdk");
+
+AWS.config.update({
+  accessKeyId: process.env.AWS_ACCESS_KEY,
+  secretAccessKey: process.env.AWS_SECRET_KEY,
+  region: "ap-northeast-2", // 예: 'us-west-2'
+});
+
+const s3 = new AWS.S3();
 
 module.exports = (db) => {
   router.post(`/add`, authenticateUser(db), (req, res) => {
     const user = req.user;
-    const { room, pros, cons, score } = req.body;
+    const { room, pros, cons, score, imageUrl } = req.body;
     let count;
     let roomId;
     db.query(
@@ -36,8 +45,8 @@ module.exports = (db) => {
               roomId = results.insertId; // 새로 생성된 room의 id
 
               db.query(
-                `INSERT INTO review (roomId, userId, nickname, pros, cons, score) VALUES (?, ?, ?, ?, ?, ?)`,
-                [roomId, user.id, user.nickname, pros, cons, score],
+                `INSERT INTO review (roomId, userId, nickname, pros, cons, score, imageUrl) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [roomId, user.id, user.nickname, pros, cons, score, imageUrl],
                 (error, results) => {
                   if (error) return res.status(400).send(error);
                   return res.status(200).send("OK");
@@ -55,8 +64,8 @@ module.exports = (db) => {
               if (results.length > 0) return res.status(202).send("중복방");
 
               db.query(
-                `INSERT INTO review (roomId, userId, nickname, pros, cons, score) VALUES (?, ?, ?, ?, ?, ?)`,
-                [roomId, user.id, user.nickname, pros, cons, score],
+                `INSERT INTO review (roomId, userId, nickname, pros, cons, score, imageUrl) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [roomId, user.id, user.nickname, pros, cons, score, imageUrl],
                 (error, results) => {
                   if (error) return res.status(400).send(error);
                   return res.status(200).send("OK");
@@ -125,7 +134,8 @@ module.exports = (db) => {
     review.nickname,
     review.pros,
     review.cons,
-    review.score
+    review.score,
+    review.imageUrl
   FROM
     review
   INNER JOIN
@@ -147,10 +157,14 @@ module.exports = (db) => {
     db.query(
       `SELECT * FROM review WHERE id = ? AND userId = ?`,
       [reviewId, user.id],
-      (error, results) => {
+      async (error, results) => {
         if (error) return res.status(400).send(error);
         roomId = results[0].roomId;
-
+        if (results[0].imageUrl.length > 0)
+          await deleteImageFromS3(
+            "homereview1",
+            results[0].imageUrl.split(".com/")[1]
+          );
         db.query(
           `SELECT COUNT(*) AS count FROM review WHERE roomId = ?`,
           [roomId],
@@ -269,5 +283,62 @@ module.exports = (db) => {
       }
     );
   });
+
+  router.get("/getuploadurl", authenticateUser(db), async (req, res) => {
+    const user = req.user;
+    try {
+      const bucket = "homereview1";
+      const key = "review/" + user.nickname + "_" + new Date().getTime();
+
+      const params = {
+        Bucket: bucket,
+        Key: key,
+        Expires: 60 * 5, // URL is valid for 5 minutes
+        ContentType: "image/jpeg",
+      };
+
+      const presignedUrl = await generatePresignedUrl(params);
+      const imageUrl = `https://${bucket}.s3.${s3.config.region}.amazonaws.com/${key}`;
+
+      return res
+        .status(200)
+        .send({ presignedUrl: presignedUrl, imageUrl: imageUrl });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).send({
+        error: "An error occurred while generating the presigned URL.",
+      });
+    }
+  });
+
+  function generatePresignedUrl(params) {
+    return new Promise((resolve, reject) => {
+      s3.getSignedUrl("putObject", params, (err, url) => {
+        if (err) reject(err);
+        else resolve(url);
+      });
+    });
+  }
+
+  const deleteImageFromS3 = (bucket, key) => {
+    return new Promise((resolve, reject) => {
+      const params = {
+        Bucket: bucket,
+        Key: key,
+      };
+
+      s3.deleteObject(params, (error, data) => {
+        if (error) {
+          reject(error);
+        } else {
+          resolve(data);
+        }
+      });
+    });
+  };
+  module.exports = {
+    deleteImageFromS3,
+  };
+
   return router;
 };

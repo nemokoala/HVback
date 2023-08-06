@@ -2,6 +2,7 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { authenticateUser } = require("./userCheck");
+const { deleteImageFromS3 } = require("./review");
 const router = express.Router();
 
 module.exports = (db) => {
@@ -99,10 +100,14 @@ module.exports = (db) => {
     db.query(
       `SELECT * FROM review WHERE id = ?`,
       [reviewId],
-      (error, results) => {
+      async (error, results) => {
         if (error) return res.status(400).send(error);
         roomId = results[0].roomId;
-
+        if (results[0].imageUrl.length > 0)
+          await deleteImageFromS3(
+            "homereview1",
+            results[0].imageUrl.split(".com/")[1]
+          );
         db.query(
           `SELECT COUNT(*) AS count FROM review WHERE roomId = ?`,
           [roomId],
