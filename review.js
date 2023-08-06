@@ -62,11 +62,13 @@ module.exports = (db) => {
             async (error, results) => {
               if (error) return res.status(400).send(error);
               if (results.length > 0) {
-                if (results[0].imageUrl !== "")
+                if (imageUrl !== "") {
                   await deleteImageFromS3(
                     "homereview1",
                     imageUrl.split(".com/")[1]
                   );
+                }
+
                 return res.status(202).send("중복방");
               }
 
