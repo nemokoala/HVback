@@ -103,7 +103,7 @@ module.exports = (db) => {
       async (error, results) => {
         if (error) return res.status(400).send(error);
         roomId = results[0].roomId;
-        if (imageUrl !== "")
+        if (results[0].imageUrl !== "" || results[0].imageUrl !== null)
           //리뷰에 사진이 있을 경우 aws 사진 삭제
           await deleteImageFromS3(
             "homereview1",
