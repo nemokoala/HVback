@@ -47,10 +47,31 @@ module.exports = (db) => {
     const user = req.user;
     const deleteId = req.params.id;
     adminCheck(user);
-    db.query(`DELETE FROM room WHERE id = ?`, [deleteId], (error, results) => {
-      if (error) return res.status(400).send(error);
-      res.send("delete complete");
-    });
+
+    db.query(
+      `SELECT * FROM review WHERE roomId = ?`,
+      [deleteId],
+      (error, results) => {
+        if (error) return res.status(400).send(error);
+        //리뷰에 사진이 있는경우 사진 삭제
+        results.map(async (review) => {
+          if (review.imageUrl !== "")
+            await deleteImageFromS3(
+              "homereview1",
+              review.imageUrl.split(".com/")[1]
+            );
+        });
+
+        db.query(
+          `DELETE FROM room WHERE id = ?`,
+          [deleteId],
+          (error, results) => {
+            if (error) return res.status(400).send(error);
+            res.send("delete complete");
+          }
+        );
+      }
+    );
   });
 
   router.get(`/review/list`, authenticateUser(db), (req, res) => {
@@ -74,7 +95,8 @@ module.exports = (db) => {
     review.nickname,
     review.pros,
     review.cons,
-    review.score
+    review.score,
+    review.imageUrl
   FROM
     review
   INNER JOIN
@@ -103,7 +125,7 @@ module.exports = (db) => {
       async (error, results) => {
         if (error) return res.status(400).send(error);
         roomId = results[0].roomId;
-        if (results[0].imageUrl !== "" || results[0].imageUrl !== null)
+        if (results[0].imageUrl !== "")
           //리뷰에 사진이 있을 경우 aws 사진 삭제
           await deleteImageFromS3(
             "homereview1",
