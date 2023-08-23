@@ -203,6 +203,14 @@ module.exports = (db) => {
     );
   });
 
+  router.get(`/room/all`, (req, res) => {
+    const sido = req.params.sido;
+    db.query(`SELECT * FROM room`, [sido], (error, results) => {
+      if (error) return res.status(400).send(error);
+      return res.status(200).send(results);
+    });
+  });
+
   router.get(`/room/sido/:sido`, (req, res) => {
     const sido = req.params.sido;
     db.query(`SELECT * FROM room WHERE sido = ?`, [sido], (error, results) => {
