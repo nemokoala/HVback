@@ -317,3 +317,13 @@ app.post("/kakao/auth", (req, res) => {
     }
   );
 });
+
+app.post("/location", (req, res) => {
+  const {
+    coords: { latitude, longitude },
+  } = req.body;
+
+  console.log(`위치정보 : 위도 - ${latitude}, 경도 - ${longitude}`);
+
+  res.status(200).send(`위도: ${latitude}, 경도: ${longitude}`);
+});
