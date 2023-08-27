@@ -151,8 +151,12 @@ app.post("/login", (req, res) => {
     async (error, results) => {
       if (error) throw error;
       console.log(results[0]);
+
+      if (results.length === 0)
+        return res.status(400).send("아이디 또는 패스워드가 틀렸습니다.");
       if (results[0].kakao === 1)
         return res.status(400).send("해당 계정은 카카오로 로그인 해주세요.");
+
       const validPassword = await bcrypt.compare(password, results[0].password);
       if (!validPassword)
         return res.status(401).send("유저이름 또는 비밀번호가 틀립니다.");
