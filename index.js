@@ -296,7 +296,7 @@ app.post("/kakao/auth", (req, res) => {
         }
       }
       if (results.length > 0) {
-        if (results[0].kakao === 0)
+        if (!results[0].kakao)
           return res
             .status(400)
             .send(
