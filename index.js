@@ -71,7 +71,7 @@ app.get("/email", async (req, res) => {
 });
 app.post("/register", async (req, res) => {
   const { nickname, email, password } = req.body;
-  const nicknameRegex = /^[a-zA-Z가-힣]{2,8}$/; // 영어, 한글 8글자 이내
+  const nicknameRegex = /^[a-zA-Z가-힣0-9]{2,8}$/; // 영어, 한글 8글자 이내
   const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/; // 이메일 형식
   const passwordRegex = /^(?=.*[a-zA-Z])(?=.*\d).{8,}$/; // 영어, 숫자 포함 8자리 이상
 
@@ -296,6 +296,12 @@ app.post("/kakao/auth", (req, res) => {
         }
       }
       if (results.length > 0) {
+        if (results[0].kakao === 0)
+          return res
+            .status(400)
+            .send(
+              "해당 이메일은 일반 계정으로 이미 가입되어 있습니다. 카카오 로그인/가입이 아닌 일반 로그인으로 시도해 주세요."
+            );
         const validPassword = await bcrypt.compare(
           password,
           results[0].password
