@@ -9,6 +9,7 @@ module.exports = (db) => {
   function adminCheck(user) {
     if (user.role !== "ADMIN") return res.status(202).send("no admin");
   }
+
   router.get(`/check`, authenticateUser(db), (req, res) => {
     const user = req.user;
     adminCheck(user);
@@ -28,10 +29,55 @@ module.exports = (db) => {
     const user = req.user;
     const deleteId = req.params.id;
     adminCheck(user);
-    db.query(`DELETE FROM users WHERE id = ?`, [deleteId], (error, results) => {
-      if (error) return res.status(400).send(error);
-      res.send("delete complete");
-    });
+
+    db.query(
+      // ROOM의 자식이 1개인 리뷰의 룸을 우선 삭제.
+      `SELECT * FROM review WHERE userId = ?`,
+      [deleteId],
+      (error, results) => {
+        if (error) return res.status(400).send(error);
+        console.log(`첫번째 results 결과 : ${JSON.stringify(results)}`);
+        if (results.length > 0)
+          //유저가 작성한 리뷰가 있을 경우
+          results.map((review) => {
+            db.query(
+              `SELECT COUNT(*) AS count FROM review WHERE roomId = ?`,
+              [review.roomId],
+              (error, results) => {
+                if (error) return res.status(400).send(error);
+                console.log(`리뷰 카운트 : ${results[0].count}`);
+                if (results[0].count === 1)
+                  db.query(
+                    `DELETE FROM room WHERE id = ?`,
+                    [review.roomId],
+                    (error, results) => {
+                      if (error) return res.status(400).send(error);
+                      db.query(
+                        `DELETE FROM users WHERE id = ?`,
+                        [deleteId],
+                        (error, results) => {
+                          if (error) return res.status(400).send(error);
+                          res.send("delete complete");
+                        }
+                      );
+                    }
+                  );
+              }
+            );
+          });
+        //유저가 작성한 리뷰가 없을 경우
+        else
+          db.query(
+            `DELETE FROM users WHERE id = ?`,
+            [deleteId],
+            (error, results) => {
+              if (error) return res.status(400).send(error);
+              res.send("delete complete");
+            }
+          );
+        // }
+      }
+    );
   });
 
   router.get(`/room/list`, authenticateUser(db), (req, res) => {

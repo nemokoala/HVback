@@ -42,7 +42,7 @@ module.exports = (db) => {
   router.post(`/update`, authenticateUser(db), async (req, res) => {
     const user = req.user;
     const { nickname, password } = req.body;
-    const nicknameRegex = /^[a-zA-Z가-힣]{2,8}$/; // 영어, 한글 8글자 이내
+    const nicknameRegex = /^[a-zA-Z가-힣0-9]{2,8}$/; // 영어, 한글 8글자 이내
     const passwordRegex = /^(?=.*[a-zA-Z])(?=.*\d).{8,}$/; // 영어, 숫자 포함 8자리 이상
     if (!nicknameRegex.test(nickname)) {
       return res
